@@ -30,7 +30,6 @@ def create_fixation_cross():
     """Creates a fixation cross stimulus."""
     return xpy.stimuli.FixCross(size=(20, 20), line_width=4, colour=CONFIG["fg_color"])
 
-
 # DOTS stimuli
 #iteratively create the two frames of the DOTS condition using a loop to avoid repetition
 canvas_dots_frame1 = create_blank_canvas()
@@ -53,30 +52,23 @@ xpy.stimuli.Rectangle(size=(CONFIG["shape_size"], CONFIG["shape_size"]), positio
 xpy.stimuli.Circle(radius=CONFIG["circle_radius"], position=(120, -50), colour=CONFIG["fg_color"]).plot(canvas_shapes_frame2)
 
 # Fixation cross and text screens
-thing1 = xpy.stimuli.FixCross(size=(20, 20), line_width=4, colour=CONFIG["fg_color"])
-screen5 = xpy.stimuli.BlankScreen(colour=CONFIG["bg_color"])
-thing1.plot(screen5)
-text1 = xpy.stimuli.TextScreen(heading="Ternus experiment", text="Keep your eyes on the central cross.\n\nLEFT = element motion\nRIGHT = group motion\n\nPress SPACE to start.")
-text2 = xpy.stimuli.TextScreen(heading="What did you see?", text="LEFT = element motion\nRIGHT = group motion")
-screen6 = xpy.stimuli.BlankScreen(colour=CONFIG["bg_color"])
+""" changed variable names to actually name what they represent and added a blank screen with fixation cross to be used in the trials """
+fixation_cross = create_fixation_cross()
+blank_screen_w_fixation_cross = create_blank_canvas()
+blank_screen_w_fixation_cross.plot(fixation_cross)
+blank_screen_clean = create_blank_canvas()
+
+instructions_screen = xpy.stimuli.TextScreen(heading="Ternus experiment", text="Keep your eyes on the central cross.\n\nLEFT = element motion\nRIGHT = group motion\n\nPress SPACE to start.")
+response_screen = xpy.stimuli.TextScreen(heading="What did you see?", text="LEFT = element motion\nRIGHT = group motion")
 
 # Fixation on stimulus and text screens
-thing1.plot(canvas_dots_frame1)
-thing1.plot(canvas_dots_frame2)
-thing1.plot(canvas_shapes_frame1)
-thing1.plot(canvas_shapes_frame2)
-thing1.plot(text1)
-thing1.plot(text2)
+for canvas in [canvas_dots_frame1, canvas_dots_frame2, canvas_shapes_frame1, canvas_shapes_frame2]:
+    fixation_cross.plot(canvas)
 
 # Preloading
-canvas_dots_frame1.preload()
-canvas_dots_frame2.preload()
-canvas_shapes_frame1.preload()
-canvas_shapes_frame2.preload()
-screen5.preload()
-text1.preload()
-text2.preload()
-screen6.preload()
+#loop through all stimuli to preload them and avoid delays during the experiment
+for stimulus in [canvas_dots_frame1, canvas_dots_frame2, canvas_shapes_frame1, canvas_shapes_frame2, blank_screen_w_fixation_cross, blank_screen_clean, instructions_screen, response_screen]:
+    stimulus.preload()  
 
 # DOTS block and trial construction
 b1 = xpy.design.Block(name="DOTS")
@@ -108,19 +100,19 @@ for i in range(len(b2.trials) - 1, 0, -1):
 for t in b1.trials:
     t.add_stimulus(canvas_dots_frame1)
     t.add_stimulus(canvas_dots_frame2)
-    t.add_stimulus(screen5)
-    t.add_stimulus(text2)
-    t.add_stimulus(screen5)
-    t.add_stimulus(screen6)
+    t.add_stimulus(instructions_screen)
+    t.add_stimulus(response_screen)
+    t.add_stimulus(blank_screen_w_fixation_cross)
+    t.add_stimulus(blank_screen_clean)
 
 # Stimuli for SHAPES trials
 for t in b2.trials:
     t.add_stimulus(canvas_shapes_frame1)
     t.add_stimulus(canvas_shapes_frame2)
-    t.add_stimulus(screen5)
-    t.add_stimulus(text2)
-    t.add_stimulus(screen5)
-    t.add_stimulus(screen6)
+    t.add_stimulus(instructions_screen)
+    t.add_stimulus(response_screen)
+    t.add_stimulus(blank_screen_w_fixation_cross)
+    t.add_stimulus(blank_screen_clean)
 
 # Experiment start
 e.add_block(b1)
@@ -132,7 +124,7 @@ if e.subject % 2 == 0:
     e.blocks.reverse()
 
 # Instructions
-text1.present()
+instructions_screen.present()
 e.keyboard.wait(keys=[xpy.misc.constants.K_SPACE])
 
 # Trial presentation
