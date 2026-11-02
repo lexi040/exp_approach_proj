@@ -17,10 +17,11 @@ CONFIG = {
     "iti_duration_ms": 500,
 }
 
-# Experiment initialization
-e = xpy.design.Experiment(name=CONFIG["experiment_name"], background_colour=CONFIG["bg_color"], foreground_colour=CONFIG["fg_color"])
-e.data_variable_names = ["condition", "trial", "isi_ms", "frame_ms", "response", "group_response", "key", "rt_ms"]
-xpy.control.initialize(e)
+#experiment initialization
+#changed name of experiment variable from e to experiment
+experiment = xpy.design.Experiment(name=CONFIG["experiment_name"], background_colour=CONFIG["bg_color"], foreground_colour=CONFIG["fg_color"])
+experiment.data_variable_names = ["condition", "trial", "isi_ms", "frame_ms", "response", "group_response", "key", "rt_ms"]
+xpy.control.initialize(experiment)
 
 def create_blank_canvas():
     """Creates a blank canvas with the specified background color."""
@@ -55,115 +56,98 @@ xpy.stimuli.Circle(radius=CONFIG["circle_radius"], position=(120, -50), colour=C
 """ changed variable names to actually name what they represent and added a blank screen with fixation cross to be used in the trials """
 fixation_cross = create_fixation_cross()
 blank_screen_w_fixation_cross = create_blank_canvas()
-blank_screen_w_fixation_cross.plot(fixation_cross)
+fixation_cross.plot(blank_screen_w_fixation_cross)
 blank_screen_clean = create_blank_canvas()
 
 instructions_screen = xpy.stimuli.TextScreen(heading="Ternus experiment", text="Keep your eyes on the central cross.\n\nLEFT = element motion\nRIGHT = group motion\n\nPress SPACE to start.")
 response_screen = xpy.stimuli.TextScreen(heading="What did you see?", text="LEFT = element motion\nRIGHT = group motion")
+
+fixation_cross.plot(instructions_screen)
+fixation_cross.plot(response_screen)
 
 # Fixation on stimulus and text screens
 for canvas in [canvas_dots_frame1, canvas_dots_frame2, canvas_shapes_frame1, canvas_shapes_frame2]:
     fixation_cross.plot(canvas)
 
 # Preloading
-#loop through all stimuli to preload them and avoid delays during the experiment
+#loop through all stimuli to preload them
 for stimulus in [canvas_dots_frame1, canvas_dots_frame2, canvas_shapes_frame1, canvas_shapes_frame2, blank_screen_w_fixation_cross, blank_screen_clean, instructions_screen, response_screen]:
     stimulus.preload()  
 
-# DOTS block and trial construction
-b1 = xpy.design.Block(name="DOTS")
-b1.set_factor("condition", "DOTS")
-for v in [0, 0, 0, 0, 0, 50, 50, 50, 50, 50, 500, 500, 500, 500, 500, 1000, 1000, 1000, 1000, 1000]:
-    t = xpy.design.Trial()
-    t.set_factor("isi_ms", v)
-    b1.add_trial(t)
+#function that creates a trial block (follows DRY principle)
+def create_trial_block(condition_name: str, frame1, frame2) -> xpy.design.Block:
+    """Creates a radomized trial block with the specified conditione."""
+    block = xpy.design.Block(name=condition_name)
+    block.set_factor("condition", condition_name)
+    #generate trials for each ISI value and add them to the block
+    #20 trials total 4 isi values * 5 trials per isi value
+    isi_factor_list = CONFIG["isi_values"] * CONFIG["trials_per_isi"]
+    #randomize the order of the trials
+    random.shuffle(isi_factor_list)
 
-# Randomization of DOTS trials
-for i in range(len(b1.trials) - 1, 0, -1):
-    j = random.randint(0, i)
-    b1.trials[i], b1.trials[j] = b1.trials[j], b1.trials[i]
+    for v in isi_factor_list:
+        t = xpy.design.Trial()
+        t.set_factor("isi_ms", v)
+        t.add_stimulus(frame1)
+        t.add_stimulus(frame2)
+        t.add_stimulus(blank_screen_w_fixation_cross)
+        t.add_stimulus(response_screen)
+        t.add_stimulus(blank_screen_clean)
+        block.add_trial(t)
 
-# SHAPES block and trial construction
-b2 = xpy.design.Block(name="SHAPES")
-b2.set_factor("condition", "SHAPES")
-for v in [0, 0, 0, 0, 0, 50, 50, 50, 50, 50, 500, 500, 500, 500, 500, 1000, 1000, 1000, 1000, 1000]:
-    t = xpy.design.Trial()
-    t.set_factor("isi_ms", v)
-    b2.add_trial(t)
+    return block
 
-# Randomization of SHAPES trials
-for i in range(len(b2.trials) - 1, 0, -1):
-    j = random.randint(0, i)
-    b2.trials[i], b2.trials[j] = b2.trials[j], b2.trials[i]
+dots_block = create_trial_block("DOTS", canvas_dots_frame1, canvas_dots_frame2)
+shapes_block = create_trial_block("SHAPES", canvas_shapes_frame1, canvas_shapes_frame2)
 
-# Stimuli for DOTS trials
-for t in b1.trials:
-    t.add_stimulus(canvas_dots_frame1)
-    t.add_stimulus(canvas_dots_frame2)
-    t.add_stimulus(instructions_screen)
-    t.add_stimulus(response_screen)
-    t.add_stimulus(blank_screen_w_fixation_cross)
-    t.add_stimulus(blank_screen_clean)
+experiment.add_block(dots_block)
+experiment.add_block(shapes_block)
 
-# Stimuli for SHAPES trials
-for t in b2.trials:
-    t.add_stimulus(canvas_shapes_frame1)
-    t.add_stimulus(canvas_shapes_frame2)
-    t.add_stimulus(instructions_screen)
-    t.add_stimulus(response_screen)
-    t.add_stimulus(blank_screen_w_fixation_cross)
-    t.add_stimulus(blank_screen_clean)
-
-# Experiment start
-e.add_block(b1)
-e.add_block(b2)
+#start experiment
 xpy.control.start(skip_ready_screen=True)
-
-# Counterbalancing
-if e.subject % 2 == 0:
-    e.blocks.reverse()
-
-# Instructions
 instructions_screen.present()
-e.keyboard.wait(keys=[xpy.misc.constants.K_SPACE])
+experiment.keyboard.wait(keys=[xpy.misc.constants.K_SPACE])
 
-# Trial presentation
-for b in e.blocks:
-    for t in b.trials:
-        v = t.get_factor("isi_ms")
-        t.stimuli[2].present()
-        e.clock.wait(200)
+#kept coounterbalancig logic
+if experiment.subject % 2 == 0:
+    experiment.blocks.reverse()
 
+for block in experiment.blocks:
+    for trial in block.trials:
+        isi = trial.get_factor("isi_ms")
+
+        #present initial fixation
+        trial.stimuli[2].present()  
+        experiment.clock.wait(CONFIG["fixation_duration_ms"])
+
+        #present the 3 alternating frames 
         for i in range(3):
-            t.stimuli[0].present()
-            e.clock.wait(250)
-            if v > 0:
-                t.stimuli[4].present()
-                e.clock.wait(v)
+            trial.stimuli[0].present()  #frame 1
+            experiment.clock.wait(CONFIG["frame_duration_ms"])
+            if isi > 0:
+                trial.stimuli[2].present()  #blank with fixation cross
+                experiment.clock.wait(isi)
 
-            t.stimuli[1].present()
-            e.clock.wait(250)
-            if v > 0:
-                t.stimuli[4].present()
-                e.clock.wait(v)
+            trial.stimuli[1].present()  #frame 2
+            experiment.clock.wait(CONFIG["frame_duration_ms"])
+            if isi > 0:
+                trial.stimuli[2].present()  #lank with fixation cross
+                experiment.clock.wait(isi)
 
-        # Response collection
-        t.stimuli[3].present()
-        k, r = e.keyboard.wait(keys=[xpy.misc.constants.K_LEFT, xpy.misc.constants.K_RIGHT])
+        #response collection
+        trial.stimuli[3].present(clear = False)  #response screen
+        key, rt = experiment.keyboard.wait(keys=[xpy.misc.constants.K_LEFT, xpy.misc.constants.K_RIGHT])
 
-        if k == xpy.misc.constants.K_LEFT:
-            a = "element"
-            g = 0
-        else:
-            a = "group"
-            g = 1
+        response = "element" if key == xpy.misc.constants.K_LEFT else "group"
+        group_response = 0 if key == xpy.misc.constants.K_LEFT else 1
 
-        # Intertrial interval
-        t.stimuli[5].present()
-        e.clock.wait(500)
-        # Data saving
-        e.data.add([b.get_factor("condition"), t.id, v, 250, a, g, k, r])
-        e.data.save()
+        #interval between trials
+        trial.stimuli[4].present()  #blank clean screen
+        experiment.clock.wait(CONFIG["iti_duration_ms"])
 
-# Experiment end
+        #save data
+        experiment.data.add([block.get_factor("condition"), trial.id, isi, CONFIG["frame_duration_ms"], response, group_response, key, rt])
+        experiment.data.save()
+
 xpy.control.end()
+
